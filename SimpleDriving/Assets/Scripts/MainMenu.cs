@@ -4,11 +4,15 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using TMPro;
 using System;
+using UnityEngine.UI;
 
 public class MainMenu : MonoBehaviour
 {
     [SerializeField] private TMP_Text highScoreText;
     [SerializeField] private TMP_Text energyText;
+    [SerializeField] private Button playButton;
+    [SerializeField] private AndroidNotificationHandler androidNotificationHandler;
+    [SerializeField] private IOSNotificationHandler iOSNotificationHandler;
     [SerializeField] private int maxEnergy;
     [SerializeField] private int energyRechargeDurationMinutes;
 
@@ -17,8 +21,18 @@ public class MainMenu : MonoBehaviour
     private const string EnergyKey = "Energy";
     private const string EnergyReadyKey = "EnergyReady";
 
-    public void Start()
+
+    private void Start()
     {
+        OnApplicationFocus(true);
+    }
+
+    public void OnApplicationFocus(bool hasFocus)
+    {
+        if(!hasFocus) { return; }
+
+        CancelInvoke();
+
         int highScore = PlayerPrefs.GetInt(ScoreSystem.HighScoreKey, 0);
         highScoreText.text = $"High Score: {highScore}";
 
@@ -36,8 +50,21 @@ public class MainMenu : MonoBehaviour
                 energy = maxEnergy;
                 PlayerPrefs.SetInt(EnergyKey, energy);
             }
+            else
+            {
+                playButton.interactable = false;
+                Invoke(nameof(EnergyRecharged), (energyReady - DateTime.Now).Seconds);
+            }
         }
 
+        energyText.text = $"Play({energy})";
+    }
+
+    private void EnergyRecharged()
+    {
+        playButton.interactable = true;
+        energy = maxEnergy;
+        PlayerPrefs.SetInt(EnergyKey, energy);
         energyText.text = $"Play({energy})";
     }
 
@@ -52,6 +79,11 @@ public class MainMenu : MonoBehaviour
         {
             DateTime energyReady = DateTime.Now.AddMinutes(energyRechargeDurationMinutes);
             PlayerPrefs.SetString(EnergyReadyKey, energyReady.ToString());
+#if UNITY_ANDROID
+            androidNotificationHandler.ScheduleNotification(energyReady);
+#elif UNITY_IOS
+            iOSNotificationHandler.ScheduleNotification(energyRechargeDurationMinutes);
+#endif
         }
 
         SceneManager.LoadScene(1);
